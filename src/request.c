@@ -72,14 +72,16 @@ handle_close (XdpRequest *object,
       if (request->impl_request &&
           !xdp_impl_request_call_close_sync (request->impl_request, NULL, &error))
         {
-          g_dbus_method_invocation_return_gerror (invocation, error);
+          if (invocation)
+            g_dbus_method_invocation_return_gerror (invocation, error);
           return TRUE;
         }
 
       request_unexport (request);
     }
 
-  xdp_request_complete_close (XDP_REQUEST (request), invocation);
+  if (invocation)
+    xdp_request_complete_close (XDP_REQUEST (request), invocation);
 
   return TRUE;
 }
@@ -283,4 +285,41 @@ request_set_impl_request (Request *request,
                           XdpImplRequest *impl_request)
 {
   g_set_object (&request->impl_request, impl_request);
+}
+
+void
+close_requests_for_sender (const char *sender)
+{
+  GSList *list = NULL;
+  GSList *l;
+  GHashTableIter iter;
+  Request *request;
+
+  G_LOCK (requests);
+  g_hash_table_iter_init (&iter, requests);
+  while (g_hash_table_iter_next (&iter, NULL, (gpointer *)&request))
+    {
+      if (strcmp (sender, request->sender) == 0)
+        list = g_slist_prepend (list, g_object_ref (request));
+    }
+  G_UNLOCK (requests);
+
+g_print ("closing %d requests for %s\n", g_slist_length (list), sender);
+
+  for (l = list; l; l = l->next)
+    {
+      Request *request = l->data;
+
+      REQUEST_AUTOLOCK (request);
+
+      if (request->exported)
+        {
+          if (request->impl_request)
+            xdp_impl_request_call_close_sync (request->impl_request, NULL, NULL);
+
+          request_unexport (request);
+        }
+    }
+
+  g_slist_free_full (list, g_object_unref);
 }
