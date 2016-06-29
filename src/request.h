@@ -56,6 +56,7 @@ Request *request_from_invocation (GDBusMethodInvocation *invocation);
 void request_export (Request *request,
                      GDBusConnection *connection);
 void request_unexport (Request *request);
+void close_requests_for_sender (const char *sender);
 
 void request_set_impl_request (Request *request,
                                XdpImplRequest *impl_request);
