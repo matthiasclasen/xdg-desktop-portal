@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<!--
+ Copyright (C) 2016 Red Hat, Inc.
+
+ This library is free software; you can redistribute it and/or
+ modify it under the terms of the GNU Lesser General Public
+ License as published by the Free Software Foundation; either
+ version 2 of the License, or (at your option) any later version.
+
+ This library is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ Lesser General Public License for more details.
+
+ You should have received a copy of the GNU Lesser General Public
+ License along with this library. If not, see <http://www.gnu.org/licenses/>.
+
+ Author: Matthias Clasen <mclasen@redhat.com>
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+  <!--
+      org.freedesktop.portal.Geolocation.Location:
+      @short_description: Interface for location
+
+      This interface defines a signal that is sent to the sandboxed
+      applications that have requested to track locations.
+  -->
+  <interface name="org.freedesktop.portal.Geolocation">
+    <!--
+        LocationUpdated:
+        @latitude: latitude, in degrees
+        @longitude longitude, in degrees
+        @altitude: altitude, in meters
+        @accuracy: accuracy of the location fix, in meters
+        @speed: speed, in meters per second
+        @heading: heading direction, in degrees with respect to North
+        @description: description of the location
+
+        The LocationUpdated signal is emitted when the location changes.
+        It is emitted on the object path that is returned from the
+        org.freedesktop.portal.Geolocation.TrackLocation() request.
+     -->
+    <signal name="LocationUpdated">
+      <arg type="d" name="latitude"/>
+      <arg type="d" name="longitude"/>
+      <arg type="d" name="altitude"/>
+      <arg type="d" name="accuracy"/>
+      <arg type="d" name="speed"/>
+      <arg type="d" name="heading"/>
+      <arg type="s" name="description"/>
+    </signal>
+    <!--
+        TrackLocation:
+        @parent_window: Identifier for the application window
+        @options: Vardict with optional further information
+        @handle: Object path for the #org.freedesktop.portal.Request object representing this call
+
+        Request updates on the location. The updates will be
+        provided via the #org.freedesktop.portal.Geolocation.Location::LocationUpdated
+        signal.
+
+        To stop receiving location updates, call org.freedesktop.portal.Request.Close().
+    -->
+    <method name="TrackLocation">
+      <arg type="s" name="parent_window" direction="in"/>
+      <arg type="a{sv}" name="options" direction="in"/>
+      <arg type="o" name="handle" direction="out"/>
+    </method>
+  </interface>
+</node>

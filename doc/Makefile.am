@@ -10,6 +10,7 @@ portal_files = 								\
 	$(top_srcdir)/data/org.freedesktop.portal.ProxyResolver.xml 	\
 	$(top_srcdir)/data/org.freedesktop.portal.Notification.xml 	\
 	$(top_srcdir)/data/org.freedesktop.portal.Inhibit.xml	 	\
+	$(top_srcdir)/data/org.freedesktop.portal.Geolocation.xml	\
 	$(top_srcdir)/data/org.freedesktop.impl.portal.Request.xml 	\
 	$(top_srcdir)/data/org.freedesktop.impl.portal.FileChooser.xml 	\
 	$(top_srcdir)/data/org.freedesktop.impl.portal.AppChooser.xml 	\

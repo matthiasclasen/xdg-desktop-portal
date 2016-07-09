@@ -28,6 +28,7 @@ PORTAL_IFACE_FILES =\
 	data/org.freedesktop.portal.Screenshot.xml \
 	data/org.freedesktop.portal.Notification.xml \
 	data/org.freedesktop.portal.Inhibit.xml \
+	data/org.freedesktop.portal.Geolocation.xml \
 	$(NULL)
 
 PORTAL_IMPL_IFACE_FILES =\
@@ -101,6 +102,8 @@ xdg_desktop_portal_SOURCES = \
         src/notification.h              \
         src/inhibit.c                   \
         src/inhibit.h                   \
+        src/geolocation.c               \
+        src/geolocation.h               \
 	src/request.c			\
 	src/request.h			\
         src/documents.c                 \
