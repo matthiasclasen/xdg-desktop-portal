@@ -30,7 +30,8 @@
 #include "xdp-dbus.h"
 #include "xdp-utils.h"
 
-#define TABLE_NAME "notifications"
+#define PERMISSIONS_TABLE "portals"
+#define PERMISSIONS_ID "notification"
 
 typedef struct _Notification Notification;
 typedef struct _NotificationClass NotificationClass;
@@ -74,8 +75,8 @@ get_notification_allowed (const char *app_id)
   g_autoptr(GError) error = NULL;
 
   if (!xdp_impl_permission_store_call_lookup_sync (get_permission_store (),
-                                                   TABLE_NAME,
-                                                   "notification",
+                                                   PERMISSIONS_TABLE,
+                                                   PERMISSIONS_ID,
                                                    &out_perms,
                                                    &out_data,
                                                    NULL,
