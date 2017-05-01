@@ -31,13 +31,18 @@
 
 G_LOCK_DEFINE (app_ids);
 static GHashTable *app_ids;
+static GHashTable *app_infos;
 
 static void
 ensure_app_ids (void)
 {
   if (app_ids == NULL)
-    app_ids = g_hash_table_new_full (g_str_hash, g_str_equal,
-                                     g_free, g_free);
+    {
+      app_ids = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                       g_free, g_free);
+      app_infos = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                         g_free, (GDestroyNotify)g_hash_table_unref);
+    }
 }
 
 /* Returns NULL on failure, keyfile with name "" if not sandboxed, and full app-info otherwise */
@@ -131,6 +136,23 @@ xdp_get_app_id_from_pid (pid_t pid,
   return g_key_file_get_string (app_info, "Application", "name", error);
 }
 
+GKeyFile *
+xdp_get_app_info (const char *app_id)
+{
+  GKeyFile *app_info = NULL;
+
+  G_LOCK (app_ids);
+  if (app_ids)
+    {
+      app_info = g_hash_table_lookup (app_infos, app_id);
+      if (app_info)
+        g_key_file_ref (app_info);
+    }
+  G_UNLOCK (app_ids);
+
+  return app_info;
+}
+
 static char *
 xdp_connection_lookup_app_id_sync (GDBusConnection       *connection,
                                    const char            *sender,
@@ -139,6 +161,7 @@ xdp_connection_lookup_app_id_sync (GDBusConnection       *connection,
 {
   g_autoptr(GDBusMessage) msg = NULL;
   g_autoptr(GDBusMessage) reply = NULL;
+  g_autoptr(GKeyFile) app_info = NULL;
   char *app_id = NULL;
   GVariant *body;
   guint32 pid;
@@ -176,12 +199,16 @@ xdp_connection_lookup_app_id_sync (GDBusConnection       *connection,
 
   g_variant_get (body, "(u)", &pid);
 
-  app_id = xdp_get_app_id_from_pid (pid, error);
+  app_info = parse_app_info_from_fileinfo (pid, error);
+  if (app_info)
+    app_id = g_key_file_get_string (app_info, "Application", "name", error);
+
   if (app_id)
     {
       G_LOCK (app_ids);
       ensure_app_ids ();
       g_hash_table_insert (app_ids, g_strdup (sender), g_strdup (app_id));
+      g_hash_table_insert (app_infos, g_strdup (app_id), g_key_file_ref (app_info));
       G_UNLOCK (app_ids);
     }
 
@@ -218,7 +245,14 @@ name_owner_changed (GDBusConnection *connection,
     {
       G_LOCK (app_ids);
       if (app_ids)
-        g_hash_table_remove (app_ids, name);
+        {
+          const char *app_id;
+
+          app_id = g_hash_table_lookup (app_ids, name);
+          if (app_id)
+            g_hash_table_remove (app_infos, app_id);
+          g_hash_table_remove (app_ids, name);
+        }
       G_UNLOCK (app_ids);
 
       close_requests_for_sender (name);

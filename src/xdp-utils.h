@@ -28,6 +28,8 @@
 char * xdp_get_app_id_from_pid (pid_t pid,
                                 GError **error);
 
+GKeyFile * xdp_get_app_info (const char *app_id);
+
 char * xdp_invocation_lookup_app_id_sync (GDBusMethodInvocation *invocation,
                                           GCancellable          *cancellable,
                                           GError               **error);
