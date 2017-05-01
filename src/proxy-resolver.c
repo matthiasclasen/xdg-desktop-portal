@@ -24,7 +24,9 @@
 #include <gio/gio.h>
 
 #include "proxy-resolver.h"
+#include "request.h"
 #include "xdp-dbus.h"
+#include "xdp-utils.h"
 
 typedef struct _ProxyResolver ProxyResolver;
 typedef struct _ProxyResolverClass ProxyResolverClass;
@@ -54,16 +56,40 @@ proxy_resolver_handle_lookup (XdpProxyResolver *object,
                               GDBusMethodInvocation *invocation,
                               const char *arg_uri)
 {
+  Request *request = request_from_invocation (invocation);
   ProxyResolver *resolver = (ProxyResolver *)object;
-  GError *error = NULL;
-  g_auto (GStrv) proxies = NULL;
+  g_autoptr(GKeyFile) app_info = NULL;
+  gboolean network_available = TRUE;
 
-  proxies = g_proxy_resolver_lookup (resolver->resolver, arg_uri, NULL, &error);
-  if (error)
-    g_dbus_method_invocation_take_error (invocation, error);
+  app_info = xdp_get_app_info (request->app_id);
+  if (app_info)
+    {
+      g_auto(GStrv) shared = g_key_file_get_string_list (app_info, "Context", "shared", NULL, NULL);
+      if (shared)
+        network_available = g_strv_contains ((const char * const *)shared, "network");
+      else
+        network_available = FALSE;
+    }
+
+  if (!network_available)
+    {
+      g_dbus_method_invocation_return_error (invocation,
+                                             XDG_DESKTOP_PORTAL_ERROR,
+                                             XDG_DESKTOP_PORTAL_ERROR_NOT_ALLOWED,
+                                             "This call is not available inside the sandbox");
+    }
   else
-    g_dbus_method_invocation_return_value (invocation,
-                                           g_variant_new ("(^as)", proxies));
+    {
+      g_auto (GStrv) proxies = NULL;
+      GError *error = NULL;
+
+      proxies = g_proxy_resolver_lookup (resolver->resolver, arg_uri, NULL, &error);
+      if (error)
+        g_dbus_method_invocation_take_error (invocation, error);
+      else
+        g_dbus_method_invocation_return_value (invocation, g_variant_new ("(^as)", proxies));
+    }
+
   return TRUE;
 }
 
