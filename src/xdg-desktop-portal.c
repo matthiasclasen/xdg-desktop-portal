@@ -43,6 +43,7 @@
 #include "device.h"
 #include "account.h"
 #include "email.h"
+#include "gnome-accounts.h"
 
 static GMainLoop *loop = NULL;
 
@@ -379,6 +380,11 @@ on_bus_acquired (GDBusConnection *connection,
   if (implementation != NULL)
     export_portal_implementation (connection,
                                   email_create (connection, implementation->dbus_name));
+
+  implementation = find_portal_implementation ("org.freedesktop.impl.portal.GnomeAccounts");
+  if (implementation != NULL)
+    export_portal_implementation (connection,
+                                  gnome_accounts_create (connection, implementation->dbus_name));
 }
 
 static void

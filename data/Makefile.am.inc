@@ -12,6 +12,7 @@ dist_introspection_DATA = \
 	data/org.freedesktop.portal.Device.xml \
 	data/org.freedesktop.portal.Account.xml \
 	data/org.freedesktop.portal.Email.xml \
+	data/org.freedesktop.portal.GnomeAccounts.xml \
 	data/org.freedesktop.impl.portal.Request.xml \
 	data/org.freedesktop.impl.portal.FileChooser.xml \
 	data/org.freedesktop.impl.portal.AppChooser.xml \
@@ -22,4 +23,5 @@ dist_introspection_DATA = \
 	data/org.freedesktop.impl.portal.Access.xml \
 	data/org.freedesktop.impl.portal.Account.xml \
 	data/org.freedesktop.impl.portal.Email.xml \
+	data/org.freedesktop.impl.portal.GnomeAccounts.xml \
 	$(NULL)
