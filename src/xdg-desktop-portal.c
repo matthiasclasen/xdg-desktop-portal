@@ -411,8 +411,12 @@ on_bus_acquired (GDBusConnection *connection,
 
   implementation = find_portal_implementation ("org.freedesktop.impl.portal.Access");
   if (implementation != NULL)
-    export_portal_implementation (connection,
-                                  device_create (connection, implementation->dbus_name));
+    {
+      export_portal_implementation (connection,
+                                    device_create (connection, implementation->dbus_name));
+      export_portal_implementation (connection,
+                                    actions_create (connection, implementation->dbus_name));
+    }
 
   implementation = find_portal_implementation ("org.freedesktop.impl.portal.Account");
   if (implementation != NULL)
