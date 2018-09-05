@@ -1270,6 +1270,7 @@ on_bus_acquired (GDBusConnection *connection,
                  gpointer         user_data)
 {
   GError *error = NULL;
+  GDBusInterfaceSkeleton *file_transfer;
 
   dbus_api = xdp_dbus_documents_skeleton_new ();
 
@@ -1287,9 +1288,20 @@ on_bus_acquired (GDBusConnection *connection,
   g_signal_connect_swapped (dbus_api, "handle-info", G_CALLBACK (handle_method), portal_info);
   g_signal_connect_swapped (dbus_api, "handle-list", G_CALLBACK (handle_method), portal_list);
 
+  file_transfer = file_transfer_create ();
+
   xdp_connection_track_name_owners (connection, NULL);
 
   if (!g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON (dbus_api),
+                                         connection,
+                                         "/org/freedesktop/portal/documents",
+                                         &error))
+    {
+      g_warning ("error: %s", error->message);
+      g_error_free (error);
+    }
+
+  if (!g_dbus_interface_skeleton_export (file_transfer,
                                          connection,
                                          "/org/freedesktop/portal/documents",
                                          &error))
