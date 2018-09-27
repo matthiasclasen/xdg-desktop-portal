@@ -45,6 +45,7 @@ static XdpDbusFileTransfer *file_transfer;
 
 typedef struct
 {
+  GObject object;
   GMutex mutex;
 
   GPtrArray *files;
@@ -55,38 +56,65 @@ typedef struct
   XdpAppInfo *app_info;
 } FileTransfer;
 
-static inline void
-auto_unlock_helper (GMutex **mutex)
+typedef struct
 {
-  if (*mutex)
-    g_mutex_unlock (*mutex);
-}
+  GObjectClass parent_class;
+} FileTransferClass;
 
-static inline GMutex *
-auto_lock_helper (GMutex *mutex)
-{
-  if (mutex)
-    g_mutex_lock (mutex);
-  return mutex;
-}
+static GType file_transfer_get_type (void);
 
-#define TRANSFER_AUTOLOCK(transfer) \
-  G_GNUC_UNUSED __attribute__((cleanup (auto_unlock_helper))) \
-  GMutex * G_PASTE (auto_unlock, __LINE__) = \
-    auto_lock_helper (&transfer->mutex);
+G_DEFINE_TYPE (FileTransfer, file_transfer, G_TYPE_OBJECT)
+
+G_DEFINE_AUTOPTR_CLEANUP_FUNC (FileTransfer, g_object_unref);
 
 static void
-file_transfer_free (gpointer data)
+file_transfer_init (FileTransfer *transfer)
 {
-  FileTransfer *transfer = (FileTransfer *)data;
+  g_mutex_init (&transfer->mutex);
+}
+
+static void
+file_transfer_finalize (GObject *object)
+{
+  FileTransfer *transfer = (FileTransfer *)object;
 
   g_mutex_clear (&transfer->mutex);
   xdp_app_info_unref (transfer->app_info);
   g_ptr_array_unref (transfer->files);
   g_free (transfer->key);
   g_free (transfer->sender);
-  g_free (transfer);
+
+  G_OBJECT_CLASS (file_transfer_parent_class)->finalize (object);
 }
+
+static void
+file_transfer_class_init (FileTransferClass *class)
+{
+  G_OBJECT_CLASS (class)->finalize = file_transfer_finalize; 
+}
+
+static inline void
+auto_unlock_unref_helper (FileTransfer **transfer)
+{
+  if (!*transfer)
+    return;
+
+  g_mutex_unlock (&(*transfer)->mutex);
+  g_object_unref (*transfer);
+}
+
+static inline FileTransfer *
+auto_lock_helper (FileTransfer *transfer)
+{
+  if (transfer)
+    g_mutex_lock (&transfer->mutex);
+  return transfer;
+}
+
+#define TRANSFER_AUTOLOCK_UNREF(transfer) \
+  G_GNUC_UNUSED __attribute__((cleanup (auto_unlock_unref_helper))) \
+  FileTransfer * G_PASTE (auto_unlock_unref, __LINE__) = \
+    auto_lock_helper (transfer);
 
 G_LOCK_DEFINE (transfers);
 static GHashTable *transfers;
@@ -98,6 +126,8 @@ lookup_transfer (const char *key)
 
   G_LOCK (transfers);
   transfer = (FileTransfer *)g_hash_table_lookup (transfers, key);
+  if (transfer)
+    g_object_ref (transfer);
   G_UNLOCK (transfers);
 
   return transfer;
@@ -111,9 +141,7 @@ file_transfer_start (XdpAppInfo *app_info,
 {
   FileTransfer *transfer;
 
-  transfer = g_new0 (FileTransfer, 1);
-
-  g_mutex_init (&transfer->mutex);
+  transfer = g_object_new (file_transfer_get_type (), NULL);
 
   transfer->app_info = xdp_app_info_ref (app_info);
   transfer->sender = g_strdup (sender);
@@ -123,7 +151,7 @@ file_transfer_start (XdpAppInfo *app_info,
   transfer->files = g_ptr_array_new_with_free_func (g_free);
 
   G_LOCK (transfers);
-  g_hash_table_insert (transfers, transfer->key, transfer);
+  g_hash_table_insert (transfers, transfer->key, g_object_ref (transfer));
   G_UNLOCK (transfers);
 
   g_debug ("start file transfer owned by '%s' (%s)",
@@ -138,7 +166,7 @@ stop (gpointer data)
 {
   FileTransfer *transfer = data;
 
-  file_transfer_free (transfer);
+  g_object_unref (transfer);
 
   return G_SOURCE_REMOVE;
 }
@@ -166,7 +194,7 @@ file_transfer_add_files (FileTransfer *transfer,
   for (i = 0; files[i]; i++)
     g_ptr_array_add (transfer->files, g_strdup (files[i]));
 
-  g_debug ("add %d files to file transfer owned by '%s' (%s)", g_strv_length (files),
+  g_debug ("add %d files to file transfer owned by '%s' (%s)", g_strv_length ((char **)files),
            xdp_app_info_get_id (transfer->app_info),
            transfer->sender);
 }
@@ -245,9 +273,9 @@ start_transfer (GDBusMethodInvocation *invocation,
                 XdpAppInfo *app_info)
 {
   g_autoptr(GVariant) options = NULL;
+  g_autoptr(FileTransfer) transfer = NULL;
   gboolean writable;
   gboolean autostop;
-  FileTransfer *transfer;
   const char *sender;
 
   g_variant_get (parameters, "(@a{sv})", &options);
@@ -293,7 +321,7 @@ add_files (GDBusMethodInvocation *invocation,
       return;
     }
 
-  TRANSFER_AUTOLOCK (transfer);
+  TRANSFER_AUTOLOCK_UNREF (transfer);
 
   if (strcmp (transfer->sender, g_dbus_method_invocation_get_sender (invocation)) != 0)
     {
@@ -321,7 +349,10 @@ add_files (GDBusMethodInvocation *invocation,
 
       if (fd == -1)
         {
-          g_dbus_method_invocation_return_gerror (invocation, error);
+          g_dbus_method_invocation_return_error (invocation,
+                                                 G_DBUS_ERROR,
+                                                 G_DBUS_ERROR_ACCESS_DENIED,
+                                                 "Invalid transfer");
           return;
         }
 
@@ -368,7 +399,7 @@ retrieve_files (GDBusMethodInvocation *invocation,
       return;
     }
 
-  TRANSFER_AUTOLOCK (transfer);
+  TRANSFER_AUTOLOCK_UNREF (transfer);
 
   files = file_transfer_execute (transfer, app_info, &error);
   if (files == NULL)
@@ -400,7 +431,7 @@ stop_transfer (GDBusMethodInvocation *invocation,
       return;
     }
 
-  TRANSFER_AUTOLOCK (transfer);
+  TRANSFER_AUTOLOCK_UNREF (transfer);
 
   file_transfer_stop (transfer);
 
@@ -440,7 +471,7 @@ file_transfer_create (void)
 
   xdp_dbus_file_transfer_set_version (XDP_DBUS_FILE_TRANSFER (file_transfer), 1);
 
-  transfers = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, file_transfer_free);
+  transfers = g_hash_table_new_full (g_str_hash, g_str_equal, NULL, g_object_unref);
 
   return G_DBUS_INTERFACE_SKELETON (file_transfer);
 }
