@@ -1289,6 +1289,8 @@ on_bus_acquired (GDBusConnection *connection,
   g_signal_connect_swapped (dbus_api, "handle-list", G_CALLBACK (handle_method), portal_list);
 
   file_transfer = file_transfer_create ();
+  g_dbus_interface_skeleton_set_flags (file_transfer,
+                                       G_DBUS_INTERFACE_SKELETON_FLAGS_HANDLE_METHOD_INVOCATIONS_IN_THREAD)
 
   xdp_connection_track_name_owners (connection, NULL);
 
