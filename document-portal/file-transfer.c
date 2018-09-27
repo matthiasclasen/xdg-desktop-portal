@@ -147,10 +147,13 @@ file_transfer_start (XdpAppInfo *app_info,
   transfer->sender = g_strdup (sender);
   transfer->writable = writable;
   transfer->autostop = autostop;
-  transfer->key = g_strdup_printf ("%u", g_random_int ());
   transfer->files = g_ptr_array_new_with_free_func (g_free);
 
   G_LOCK (transfers);
+  do (
+    g_free (transfer->key);
+    transfer->key = g_strdup_printf ("%u", g_random_int ());
+  while (g_hash_table_contains (transfers, transfer->key));
   g_hash_table_insert (transfers, transfer->key, g_object_ref (transfer));
   G_UNLOCK (transfers);
 
