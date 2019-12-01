@@ -40,6 +40,11 @@
         <member>1: Running (at least one open window)</member>
         <member>2: Active (in the foreground)</member>
       </simplelist>
+
+      Note that the list of apps may not be complete, since the
+      compositor may only know about apps that have open windows.
+      Any application that is not in the list should be assumed
+      to be in the background.
     -->
     <method name='GetAppState'>
       <arg type="a{sv}" name="apps" direction="out"/>
